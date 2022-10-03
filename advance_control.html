@@ -1,0 +1,113 @@
+$def with(commands)
+
+$var title: $_(u'SIP ADV Plugin')
+$var page: advance_control
+
+<script>
+    // Initialize behaviors
+    jQuery(document).ready(function () {
+
+        jQuery("#cSubmit").click(function () {
+            jQuery("#advc").submit();
+        });
+        jQuery("button#cCancel").click(function () {
+            window.location = "/";
+        });
+
+        $for bid in range(0, gv.sd['nbrd']):
+            $for s in range(0, 8):
+                $ sid = bid * 8 + s;
+		            jQuery("#typeVal${sid}").change(function () {
+                        var e = document.getElementById("typeVal${sid}").value;
+
+						document.getElementById("detailsCommand${sid}").style.display = "none";
+                        document.getElementById("detailsShelly${sid}").style.display = "none";
+                        document.getElementById("detailsSonOff${sid}").style.display = "none";
+
+                        if (e === "comandLine")
+                        {
+                            document.getElementById("detailsCommand${sid}").style.display = "";
+                        }
+                        else if (e === "shellyHTTP")
+                        {
+							document.getElementById("detailsShelly${sid}").style.display = "";
+                        }
+						else if (e === "sonOff")
+                        {
+							document.getElementById("detailsSonOff${sid}").style.display = "";
+                        }
+		            });
+    });
+</script>
+
+<style>
+    .columnName {
+        text-align: center;
+    }
+</style>
+
+<div id="plugin">
+    <!--     <div class="title">Command Line Control -->
+    <!--     <button class="execute" id="docButton" type="button" >$_('Help')</button> -->
+    <!--     </div> -->
+    <div>
+        <p>This plugin can be used to control devices such as raspery pi.</p>
+        <p>Activate motors if needed, redirect the wather with valves to the correct place.</p>
+
+        <br /><br />
+
+        <form id="advc" name="advc" action="/advu" method="get">
+            <br />
+
+            Activate GPIO
+            <input type="checkbox" name="gpio" ${"checked" if commands['gpio'] == 1 else "" }>
+            <br /><br />
+
+            $for bid in range(0,gv.sd['nbrd']):
+                $for s in range(0,8):
+                    $ sid = bid*8 + s;
+                    ${gv.snames[sid]}:<br />
+
+                    <select name="typeVal${sid}" id="typeVal${sid}">
+                        <option value="">None</option>
+
+                    $if commands[u"typeOutput"][sid] == 'comandLine':
+                        <option selected="checked" value="comandLine">Command line</option>
+                    $else:
+                        <option value="comandLine">Command line</option>
+
+                    $if commands[u"typeOutput"][sid] == 'shellyHTTP':
+                        <option selected="checked" value="shellyHTTP">Shelly Divices</option>
+                    $else:
+                        <option value="shellyHTTP">Shelly Divices</option>
+
+                    $if commands[u"typeOutput"][sid] == 'sonOff':
+                        <option selected="checked" value="sonOff">Soon Of Divice</option>
+                    $else:
+                        <option value="sonOff">Soon Of Divice</option>
+                    </select>
+
+                    <br /> <br />
+
+                    <div id="detailsCommand${sid}" style="display:${"" if commands[u"typeOutput"][sid] == 'comandLine' else "none" }">
+                        Command Line ${sid}
+                    </div>
+
+                    <div id="detailsShelly${sid}" style="display:${"" if commands[u"typeOutput"][sid] == 'shellyHTTP' else "none" }">
+                        Shelly ${sid}
+                    </div>
+
+                    <div id="detailsSonOff${sid}" style="display:${"" if commands[u"typeOutput"][sid] == 'sonOff' else "none" }">
+                        SonOff ${sid}
+                    </div>
+
+                    <br />
+        </form>
+        <br /><br />
+    </div>
+
+    <div class="controls">
+        <button id="cSubmit" class="submit"><b>$_(u'Submit')</b></button>
+        <button id="cCancel" class="cancel danger">$_(u'Cancel')</button>
+    </div>
+</div>
