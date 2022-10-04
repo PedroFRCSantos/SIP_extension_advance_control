@@ -30,27 +30,33 @@ urls.extend(
 # Add this plugin to the plugins menu
 gv.plugin_menu.append([u"Advance Control", u"/advc"])
 
-commands = {}
-prior = [0] * len(gv.srvals)
+commandsAdv = {}
+priorAdv = [0] * len(gv.srvals)
 
 # Read in the commands for this plugin from it's JSON file
 def load_commands():
-    global commands
+    global commandsAdv
     try:
         with open(u"./data/advance_control.json", u"r") as f:
-            commands = json.load(f)  # Read the commands from file
+            commandsAdv = json.load(f)  # Read the commands from file
     except IOError:  #  If file does not exist create file with defaults.
-        commands = {u"typeOutput": [u""] * gv.sd[u"nst"], u"on": [u""] * gv.sd[u"nst"], u"off": [u""] * gv.sd[u"nst"], u"gpio": 0}
-        #commands[u"on"][0] = u"echo 'example start command for station 1'"
-        #commands[u"off"][0] = u"echo 'example stop command for station 1'"
+        commandsAdv = {u"typeOutput": [u""] * gv.sd[u"nst"], u"deviceIP": [u""] * gv.sd[u"nst"], u"deviceProtocol": [u""] * gv.sd[u"nst"], u"devicePort": [u""] * gv.sd[u"nst"], u"deviceUserName": [u""] * gv.sd[u"nst"], u"devicePassword": [u""] * gv.sd[u"nst"], u"deviceKeepState": [u"0"] * gv.sd[u"nst"], u"on": [u""] * gv.sd[u"nst"], u"off": [u""] * gv.sd[u"nst"], u"useLatch": [0] * gv.sd[u"nst"], u"gpio": 0}
+        
+        # set the protocol by default http and port 80
+        for i in range(gv.sd[u"nst"]):
+            commandsAdv["deviceProtocol"][i] = "http"
+            commandsAdv["devicePort"][i] = "80"
+        
+        #commandsAdv[u"on"][0] = u"echo 'example start command for station 1'"
+        #commandsAdv[u"off"][0] = u"echo 'example stop command for station 1'"
         with open(u"./data/advance_control.json", u"w") as f:
-            json.dump(commands, f, indent=4)
+            json.dump(commandsAdv, f, indent=4)
     return
 
 
 load_commands()
 
-if commands["gpio"]:
+if commandsAdv["gpio"]:
     gv.use_gpio_pins = False
 else:
     gv.use_gpio_pins = True
@@ -59,19 +65,19 @@ else:
 #### output command when signal received ####
 def on_zone_change(name, **kw):
     """ Send command when core program signals a change in station state."""
-    global prior
-    if gv.srvals != prior:  # check for a change
+    global priorAdv
+    if gv.srvals != priorAdv:  # check for a change
         for i in range(len(gv.srvals)):
-            if gv.srvals[i] != prior[i]:  #  this station has changed
+            if gv.srvals[i] != priorAdv[i]:  #  this station has changed
                 if gv.srvals[i]:  # station is on
-                    command = commands[u"on"][i]
+                    command = commandsAdv[u"on"][i]
                     if command:  #  If there is a command for this station:
                         subprocess.call(command.split(), shell=True)
                 else:
-                    command = commands[u"off"][i]
+                    command = commandsAdv[u"off"][i]
                     if command:
                         subprocess.call(command.split(), shell=True)
-        prior = gv.srvals[:]
+        priorAdv = gv.srvals[:]
     return
 
 
@@ -82,55 +88,110 @@ zones.connect(on_zone_change)
 # Web pages:                                                                   #
 ################################################################################
 
+def check_commands_advance_size():
+    global commandsAdv
+
+    if (
+        len(commandsAdv[u"on"]) != gv.sd[u"nst"]
+    ):  #  if number of stations has changed, adjust length of on and off lists
+        if gv.sd[u"nst"] > len(commandsAdv[u"on"]):
+            increase = [""] * (gv.sd[u"nst"] - len(commandsAdv[u"on"]))
+
+            commandsAdv[u"typeOutput"].extend(increase)
+
+            commandsAdv[u"deviceIP"].extend(increase)
+            commandsAdv[u"deviceProtocol"].extend(increase)
+            commandsAdv[u"devicePort"].extend(increase)
+
+            commandsAdv[u"deviceUserName"].extend(increase)
+            commandsAdv[u"devicePassword"].extend(increase)
+            commandsAdv[u"deviceKeepState"].extend(increase)
+
+            commandsAdv[u"useLatch"].extend(increase)
+
+            commandsAdv[u"on"].extend(increase)
+            commandsAdv[u"off"].extend(increase)
+        elif gv.sd[u"nst"] < len(commandsAdv[u"on"]):
+            commandsAdv[u"typeOutput"] = commandsAdv[u"typeOutput"][: gv.sd[u"nst"]]
+
+            commandsAdv[u"deviceIP"] = commandsAdv[u"deviceIP"][: gv.sd[u"nst"]]
+            commandsAdv[u"deviceProtocol"] = commandsAdv[u"deviceProtocol"][: gv.sd[u"nst"]]
+            commandsAdv[u"devicePort"] = commandsAdv[u"devicePort"][: gv.sd[u"nst"]]
+
+            commandsAdv[u"deviceUserName"] = commandsAdv[u"deviceUserName"][: gv.sd[u"nst"]]
+            commandsAdv[u"devicePassword"] = commandsAdv[u"devicePassword"][: gv.sd[u"nst"]]
+            commandsAdv[u"deviceKeepState"] = commandsAdv[u"deviceKeepState"][: gv.sd[u"nst"]]
+
+            commandsAdv[u"useLatch"] = commandsAdv[u"useLatch"][: gv.sd[u"nst"]]
+
+            commandsAdv[u"on"] = commandsAdv[u"on"][: gv.sd[u"nst"]]
+            commandsAdv[u"off"] = commandsAdv[u"off"][: gv.sd[u"nst"]]
+
 
 class settings(ProtectedPage):
     """Load an html page for entering cli_control commands"""
 
     def GET(self):
-        return template_render.advance_control(commands)
+        check_commands_advance_size()
+        return template_render.advance_control(commandsAdv)
 
 
 class settings_json(ProtectedPage):
     """Returns plugin settings in JSON format"""
 
     def GET(self):
+        check_commands_advance_size()
         web.header(u"Access-Control-Allow-Origin", u"*")
         web.header(u"Content-Type", u"application/json")
-        return json.dumps(commands)
+        return json.dumps(commandsAdv)
 
 
 class update(ProtectedPage):
     """Save user input to cli_control.json file"""
 
     def GET(self):
-        global commands
+        global commandsAdv
+
+        check_commands_advance_size()
+
         qdict = web.input()
-        if (
-            len(commands[u"on"]) != gv.sd[u"nst"]
-        ):  #  if number of stations has changed, adjust length of on and off lists
-            if gv.sd[u"nst"] > len(commands[u"on"]):
-                increase = [""] * (gv.sd[u"nst"] - len(commands[u"on"]))
 
-                commands[u"on"].extend(increase)
-                commands[u"off"].extend(increase)
-
-                commands[u"typeOutput"].extend(increase)
-            elif gv.sd[u"nst"] < len(commands[u"on"]):
-                commands[u"on"] = commands[u"on"][: gv.sd[u"nst"]]
-                commands[u"off"] = commands[u"off"][: gv.sd[u"nst"]]
-
-                commands[u"typeOutput"] = commands[u"typeOutput"][: gv.sd[u"nst"]]
         for i in range(gv.sd[u"nst"]):
-            commands[u"typeOutput"][i] = qdict[u"typeVal" + str(i)]
+            commandsAdv[u"typeOutput"][i] = qdict[u"typeVal" + str(i)]
 
-            #commands[u"on"][i] = qdict[u"con" + str(i)]
-            #commands[u"off"][i] = qdict[u"coff" + str(i)]
+            if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
+                commandsAdv[u"deviceIP"][i] = qdict[u"shellyIP" + str(i)]
+
+                try:
+                    currentPortNumber = int(qdict[u"shellyPort" + str(i)])
+                    commandsAdv[u"devicePort"][i] = qdict[u"shellyPort" + str(i)]
+                except ValueError:
+                    print("That's not an int!")
+
+                #read user name and password
+                commandsAdv[u"deviceUserName"][i] = qdict[u"shellyUserName" + str(i)]
+                commandsAdv[u"devicePassword"][i] = qdict[u"shellyUserPwd" + str(i)]
+
+                if qdict[u"protocol" + str(i)] is None:
+                    commandsAdv[u"deviceProtocol"][i] = "http"
+                else:
+                    commandsAdv[u"deviceProtocol"][i] = qdict[u"protocol" + str(i)]
+
+                if (u"useLatch" + str(i)) in qdict:
+                    commandsAdv[u"useLatch"][i] = 0
+                else:
+                    commandsAdv[u"useLatch"][i] = 1
+
+            commandsAdv[u"on"][i] = qdict[u"con" + str(i)]
+            commandsAdv[u"off"][i] = qdict[u"coff" + str(i)]
+
         if u"gpio" in qdict:
-            commands[u"gpio"] = 1
+            commandsAdv[u"gpio"] = 1
             gv.use_gpio_pins = False
         else:
-            commands[u"gpio"] = 0
+            commandsAdv[u"gpio"] = 0
             gv.use_gpio_pins = True
+
         with open(u"./data/advance_control.json", u"w") as f:  # write the settings to file
-            json.dump(commands, f, indent=4)
+            json.dump(commandsAdv, f, indent=4)
         raise web.seeother(u"/restart")

@@ -1,4 +1,4 @@
-$def with(commands)
+$def with(commandsAdv)
 
 $var title: $_(u'SIP ADV Plugin')
 $var page: advance_control
@@ -60,7 +60,7 @@ $var page: advance_control
             <br />
 
             Activate GPIO
-            <input type="checkbox" name="gpio" ${"checked" if commands['gpio'] == 1 else "" }>
+            <input type="checkbox" name="gpio" ${"checked" if commandsAdv['gpio'] == 1 else "" }>
             <br /><br />
 
             $for bid in range(0,gv.sd['nbrd']):
@@ -71,39 +71,74 @@ $var page: advance_control
                     <select name="typeVal${sid}" id="typeVal${sid}">
                         <option value="">None</option>
 
-                    $if commands[u"typeOutput"][sid] == 'comandLine':
+                    $if commandsAdv[u"typeOutput"][sid] == 'comandLine':
                         <option selected="checked" value="comandLine">Command line</option>
                     $else:
                         <option value="comandLine">Command line</option>
 
-                    $if commands[u"typeOutput"][sid] == 'shellyHTTP':
+                    $if commandsAdv[u"typeOutput"][sid] == 'shellyHTTP':
                         <option selected="checked" value="shellyHTTP">Shelly Divices</option>
                     $else:
                         <option value="shellyHTTP">Shelly Divices</option>
 
-                    $if commands[u"typeOutput"][sid] == 'sonOff':
+                    $if commandsAdv[u"typeOutput"][sid] == 'sonOff':
                         <option selected="checked" value="sonOff">Soon Of Divice</option>
                     $else:
                         <option value="sonOff">Soon Of Divice</option>
                     </select>
 
-                    <br /> <br />
+                    <br />
 
-                    <div id="detailsCommand${sid}" style="display:${"" if commands[u"typeOutput"][sid] == 'comandLine' else "none" }">
-                        Command Line ${sid}
+                    <div id="detailsCommand${sid}" style="display:${"" if commandsAdv[u"typeOutput"][sid] == 'comandLine' else "none" }">
+                        <table id="command${sid}">
+                            <tr>
+                                <th class="columnName">$_(u'Start Command')</th>
+                                <th class="columnName">$_(u'Stop Command')</th>
+                            </tr>
+
+                            <tr>
+                                <td class="command">                         
+                                    <input type="text" size="50" value="${commandsAdv['on'][sid] if sid < len(commandsAdv['on']) else ''}" id="con${sid}" name="con${sid}">
+                                </td>
+
+                                <td>
+                                    <input type="text" size="50" value="${commandsAdv['off'][sid] if sid < len(commandsAdv['off']) else ''}"  id="coff${sid}" name="coff${sid}">
+                                </td>                       
+                            </tr>
+                        </table>
                     </div>
 
-                    <div id="detailsShelly${sid}" style="display:${"" if commands[u"typeOutput"][sid] == 'shellyHTTP' else "none" }">
-                        Shelly ${sid}
+                    <div id="detailsShelly${sid}" style="display:${"" if commandsAdv[u"typeOutput"][sid] == 'shellyHTTP' else "none" }">
+                        Shelly Type
+                        <select name="shellyModel${sid}" id="shellyModel${sid}">
+                            <option value="shelly1">Shelly 1</option>
+                            <option value="shell2">Shelly 2</option>
+                            <option value="shell1Pro">Shelly 1 Pro - Not supported</option>
+                        </select>
+
+                        <br />
+
+                        IP: <input type="text" size="50" value="${commandsAdv['deviceIP'][sid] if sid < len(commandsAdv['on']) else ''}" id="shellyIP${sid}" name="shellyIP${sid}">
+                        <br /><br />
+                        Port: <input type="text" size="50" value="${commandsAdv['devicePort'][sid] if sid < len(commandsAdv['on']) else ''}" id="shellyPort${sid}" name="shellyPort${sid}">
+                        <br />
+                        User Name: <input type="text" size="50" value="${commandsAdv['deviceUserName'][sid] if sid < len(commandsAdv['on']) else ''}" id="shellyUserName${sid}" name="shellyUserName${sid}"><br />
+                        Password (empty, keep value): <input type="password" size="50" value="" id="shellyUserPwd${sid}" name="shellyUserPwd${sid}">
+                        <br />
+
+                        Force to keep state: <input type="checkbox" name="divaceKeepState${sid}">
+                        <br />http   <input type="radio" id="http${sid}" name="protocol${sid}" value="http" ${"checked" if commandsAdv[u"deviceProtocol"][sid] == 'http' else "" }>
+                        https <input type="radio" id="https${sid}" name="protocol${sid}" value="https" ${"checked" if commandsAdv[u"deviceProtocol"][sid] == 'https' else "" }><br /><br />
+
+                        Use latch relay (pulse): <input type="checkbox" name="useLatch" ${"checked" if commandsAdv[u"useLatch"][sid] == 1 else "" }>
                     </div>
 
-                    <div id="detailsSonOff${sid}" style="display:${"" if commands[u"typeOutput"][sid] == 'sonOff' else "none" }">
-                        SonOff ${sid}
+                    <div id="detailsSonOff${sid}" style="display:${"" if commandsAdv[u"typeOutput"][sid] == 'sonOff' else "none" }">
+                        SonOff ${sid} - Not yeat suported
                     </div>
 
                     <br />
         </form>
-        <br /><br />
     </div>
 
     <div class="controls">
