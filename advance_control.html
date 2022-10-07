@@ -108,11 +108,12 @@ $var page: advance_control
                         </table>
                     </div>
 
-                    <div id="detailsShelly${sid}" style="display:${"" if commandsAdv[u"typeOutput"][sid] == 'shellyHTTP' else "none" }">
+                    <div id="detailsShelly${sid}" name="detailsShelly${sid}" style="display:${"" if commandsAdv[u"typeOutput"][sid] == 'shellyHTTP' else "none" }">
                         Shelly Type
                         <select name="shellyModel${sid}" id="shellyModel${sid}">
-                            <option value="shelly1">Shelly 1</option>
-                            <option value="shell2">Shelly 2</option>
+                            <option value="shelly1">Shelly 1 - Channel 1</option>
+                            <option value="shell2_1">Shelly 2 - Channel 1</option>
+                            <option value="shell2_2">Shelly 2 - Channel 2</option>
                             <option value="shell1Pro">Shelly 1 Pro - Not supported</option>
                         </select>
 
@@ -123,10 +124,10 @@ $var page: advance_control
                         Port: <input type="text" size="50" value="${commandsAdv['devicePort'][sid] if sid < len(commandsAdv['on']) else ''}" id="shellyPort${sid}" name="shellyPort${sid}">
                         <br />
                         User Name: <input type="text" size="50" value="${commandsAdv['deviceUserName'][sid] if sid < len(commandsAdv['on']) else ''}" id="shellyUserName${sid}" name="shellyUserName${sid}"><br />
-                        Password (empty, keep value): <input type="password" size="50" value="" id="shellyUserPwd${sid}" name="shellyUserPwd${sid}">
+                        Password: <input type="password" size="50" value="" id="shellyUserPwd${sid}" name="shellyUserPwd${sid}">
                         <br />
 
-                        Force to keep state: <input type="checkbox" name="divaceKeepState${sid}">
+                        Force to keep state: <input type="checkbox" name="deviceKeepState${sid}" ${"checked" if commandsAdv[u"deviceKeepState"][sid] == 1 else "" }>
                         <br />http   <input type="radio" id="http${sid}" name="protocol${sid}" value="http" ${"checked" if commandsAdv[u"deviceProtocol"][sid] == 'http' else "" }>
                         https <input type="radio" id="https${sid}" name="protocol${sid}" value="https" ${"checked" if commandsAdv[u"deviceProtocol"][sid] == 'https' else "" }><br /><br />
 
