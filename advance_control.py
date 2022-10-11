@@ -8,6 +8,7 @@ import json
 from logging import lastResort
 import subprocess
 import time
+import datetime
 from threading import Thread, Lock
 
 # request HTTP
@@ -28,26 +29,102 @@ urls.extend(
         u"/advc", u"plugins.advance_control.settings",
         u"/advj", u"plugins.advance_control.settings_json",
         u"/advu", u"plugins.advance_control.update",
+        u"/advdisp", u"plugins.advance_control.valve_status_display",
+        u"/advsts", u"plugins.advance_control.check_valve_status",
     ]
 )
 # fmt: on
 
 # Add this plugin to the plugins menu
 gv.plugin_menu.append([u"Advance Control", u"/advc"])
-gv.plugin_menu.append([u"Advace Control Valve status", u"/advc"])
+gv.plugin_menu.append([u"Advace Control Valve status", u"/advdisp"])
 
 commandsAdv = {}
 priorAdv = [0] * len(gv.srvals)
 
+devicesAccessProtection = {}
+
+threadCheckOnLine = None
+lastTimeValvesOnLine = {}
+
+runValveOnLine = False
+
+def run_check_valves_on_line_keep_state():
+    global lastTimeValvesOnLine
+
+    while runValveOnLine:
+        lastTime = datetime.datetime.now()
+
+        for i in range(len(gv.srvals)):
+            if commandsAdv[u"typeOutput"][i] == "shellyHTTP" or commandsAdv[u"typeOutput"][i] == "sonOff":
+                if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
+                    # use credentials, if present
+                    if len(commandsAdv[u"deviceUserName"][i]) > 0:
+                        userData = commandsAdv[u"deviceUserName"][i] + ":" + commandsAdv[u"devicePassword"][i] + "@"
+                    else:
+                        userData = ""
+
+                    # TODO: add port
+
+                    statusURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/status"
+                else:
+                    statusURL = ""
+
+                shellyChannel = "0"
+                if commandsAdv[u"deviceModel"][i] == "shell2_2":
+                    shellyChannel = "1"
+
+                # TODO: add port
+
+                devicesAccessProtection[i].acquire()
+                resposeIsOk, response = httpResquestJSON(statusURL)
+
+                if resposeIsOk == 0:
+                    lastTimeValvesOnLine[i] = datetime.datetime.now()
+
+                # if to keep state if not in the correct state change state
+                if resposeIsOk == 0 and commandsAdv[u"deviceProtocol"][i] == 1:
+                    try:
+                        newState = response['relays'][int(shellyChannel)]['ison'] == 'True'
+                        if newState and gv.srvals[i] == 0:
+                            turnOffURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/relay/" + shellyChannel + u"?turn=off"
+                            resposeIsOkOff, response = httpResquestJSON(turnOffURL)
+                            if not resposeIsOkOff:
+                                print("Fail to turn off in keep state")
+                        elif not newState and gv.srvals[i] == 1:
+                            turnOnURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/relay/" + shellyChannel + u"?turn=on"
+                            resposeIsOkOn, response = httpResquestJSON(turnOnURL)
+                            if not resposeIsOkOn:
+                                print("Fail to turn on in keep state")
+                    except NameError:
+                        print("Error, no data found")
+
+                devicesAccessProtection[i].release()      
+
+        nowTime = datetime.datetime.now()
+
+        # read each valve after 30s
+        diffTime = nowTime - lastTime
+        lastTime = nowTime
+        secondsInt = int(diffTime.seconds)
+        if 30 - secondsInt > 0:
+            sleepTime = 30 - secondsInt
+            for k in range(sleepTime):
+                if not runValveOnLine:
+                    break
+                time.sleep(1)
+
 # Read in the commands for this plugin from it's JSON file
 def load_commands():
-    global commandsAdv
+    global commandsAdv, devicesAccessProtection, lastTimeValvesOnLine
+    global runValveOnLine, threadCheckOnLine
+
     try:
         with open(u"./data/advance_control.json", u"r") as f:
             commandsAdv = json.load(f)  # Read the commands from file
     except IOError:  #  If file does not exist create file with defaults.
         commandsAdv = {u"typeOutput": [u""] * gv.sd[u"nst"], u"deviceModel": [u""] * gv.sd[u"nst"], u"deviceIP": [u""] * gv.sd[u"nst"], u"deviceProtocol": [u""] * gv.sd[u"nst"], u"devicePort": [u""] * gv.sd[u"nst"], u"deviceUserName": [u""] * gv.sd[u"nst"], u"devicePassword": [u""] * gv.sd[u"nst"], u"deviceKeepState": [0] * gv.sd[u"nst"], u"on": [u""] * gv.sd[u"nst"], u"off": [u""] * gv.sd[u"nst"], u"useLatch": [0] * gv.sd[u"nst"], u"gpio": 0}
-        
+
         # set the protocol by default http and port 80
         for i in range(gv.sd[u"nst"]):
             commandsAdv["deviceProtocol"][i] = "http"
@@ -57,6 +134,14 @@ def load_commands():
         #commandsAdv[u"off"][0] = u"echo 'example stop command for station 1'"
         with open(u"./data/advance_control.json", u"w") as f:
             json.dump(commandsAdv, f, indent=4)
+
+    devicesAccessProtection = [Lock()] * gv.sd[u"nst"]
+    lastTimeValvesOnLine = [datetime.datetime.now()] * gv.sd[u"nst"]
+
+    runValveOnLine = True
+    threadCheckOnLine = Thread(target = run_check_valves_on_line_keep_state)
+    threadCheckOnLine.start()
+
     return
 
 
@@ -65,7 +150,8 @@ load_commands()
 if commandsAdv["gpio"]:
     gv.use_gpio_pins = False
 else:
-    gv.use_gpio_pins = True
+    gv.use_gpio_pins = True         
+        
 
 #### output command when signal received ####
 def on_zone_change(name, **kw):
@@ -85,6 +171,9 @@ def on_zone_change(name, **kw):
                         if command:
                             subprocess.call(command.split(), shell=True)
                 elif commandsAdv[u"typeOutput"][i] == "shellyHTTP" or commandsAdv[u"typeOutput"][i] == "sonOff":
+                    #start to lock device to avoid same http requets
+                    devicesAccessProtection[i].acquire()
+
                     # Check type of shelly, if any use name and password, need to check if relay
                     if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
                         # use shelly HTTP protocol
@@ -94,8 +183,14 @@ def on_zone_change(name, **kw):
                         else:
                             userData = ""
 
-                        turnOnURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/relay/0?turn=on"
-                        turnOffURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/relay/0?turn=off"
+                        shellyChannel = "0"
+                        if commandsAdv[u"deviceModel"][i] == "shell2_2":
+                            shellyChannel = "1"
+
+                        # TODO: add port
+
+                        turnOnURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/relay/" + shellyChannel + u"?turn=on"
+                        turnOffURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/relay/" + shellyChannel + u"?turn=off"
 
                         statusURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/status"
                     else:
@@ -108,6 +203,8 @@ def on_zone_change(name, **kw):
                     resposeIsOk, response = httpResquestJSON(statusURL)
 
                     if resposeIsOk == 0 and commandsAdv[u"useLatch"][i] == 0:
+                        lastTimeValvesOnLine[i] = datetime.datetime.now()
+
                         try:
                             lastState = response['relays'][0]['ison'] == 'True'
                         except NameError:
@@ -123,7 +220,7 @@ def on_zone_change(name, **kw):
                                 if resposeIsOk:
                                     try:
                                         if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
-                                            newState = response['relays'][0]['ison'] == 'True'
+                                            newState = response['relays'][int(shellyChannel)]['ison'] == 'True'
                                         else:
                                             newState = False
                                     except NameError:
@@ -172,11 +269,15 @@ def on_zone_change(name, **kw):
                             if resposeIsOkOff:
                                 print("Latch sucess")
 
+                    devicesAccessProtection[i].release()
+
         priorAdv = gv.srvals[:]
     return
 
 def httpResquestJSON(commandURL):
     # try to get corrent state of network relay
+    response = None
+
     try:
         response = requests.get(commandURL)
         resposeIsOk = 0
@@ -205,7 +306,7 @@ zones.connect(on_zone_change)
 ################################################################################
 
 def check_commands_advance_size():
-    global commandsAdv
+    global commandsAdv, devicesAccessProtection
 
     if (
         len(commandsAdv[u"on"]) != gv.sd[u"nst"]
@@ -229,6 +330,9 @@ def check_commands_advance_size():
 
             commandsAdv[u"on"].extend(increase)
             commandsAdv[u"off"].extend(increase)
+
+            increaseProtection = [Lock()] * (gv.sd[u"nst"] - len(commandsAdv[u"on"]))
+            devicesAccessProtection.extend()
         elif gv.sd[u"nst"] < len(commandsAdv[u"on"]):
             commandsAdv[u"typeOutput"] = commandsAdv[u"typeOutput"][: gv.sd[u"nst"]]
 
@@ -247,9 +351,10 @@ def check_commands_advance_size():
             commandsAdv[u"on"] = commandsAdv[u"on"][: gv.sd[u"nst"]]
             commandsAdv[u"off"] = commandsAdv[u"off"][: gv.sd[u"nst"]]
 
+            devicesAccessProtection = devicesAccessProtection[: gv.sd[u"nst"]]
 
 class settings(ProtectedPage):
-    """Load an html page for entering cli_control commands"""
+    """Load an html page for entering advance_control commands"""
 
     def GET(self):
         check_commands_advance_size()
@@ -270,7 +375,7 @@ class update(ProtectedPage):
     """Save user input to cli_control.json file"""
 
     def GET(self):
-        global commandsAdv
+        global commandsAdv, runValveOnLine
 
         check_commands_advance_size()
 
@@ -285,7 +390,7 @@ class update(ProtectedPage):
 
                 try:
                     currentPortNumber = int(qdict[u"shellyPort" + str(i)])
-                    commandsAdv[u"devicePort"][i] = qdict[u"shellyPort" + str(i)]
+                    commandsAdv[u"devicePort"][i] = currentPortNumber
                 except ValueError:
                     print("That's not an int!")
 
@@ -320,4 +425,40 @@ class update(ProtectedPage):
 
         with open(u"./data/advance_control.json", u"w") as f:  # write the settings to file
             json.dump(commandsAdv, f, indent=4)
+
+        # Restart thread to check if is network valves are on-line
+        runValveOnLine = False
+        threadCheckOnLine.join()
+        threadCheckOnLine = Thread(target = run_check_valves_on_line_keep_state)
+        threadCheckOnLine.start()
+
         raise web.seeother(u"/restart")
+
+class valve_status_display(ProtectedPage):
+    """Return status of valve"""
+
+    def GET(self):
+        check_commands_advance_size()
+        return template_render.advance_control_status(commandsAdv)
+
+class check_valve_status(ProtectedPage):
+    """Valve status"""
+
+    def GET(self):
+        qdict = web.input()
+
+        if "valveId" in qdict:
+            valveId = qdict["valveId"]
+
+            if valveId >= 0 and valveId < len(lastTimeValvesOnLine):
+                lastSeen = lastTimeValvesOnLine[valveId] # to check id
+                timeNow = datetime.datetime.now()
+
+                diff = timeNow - lastSeen
+
+                if diff.seconds > 45:
+                    return "red"
+                else:
+                    return "green"
+
+        return ""
