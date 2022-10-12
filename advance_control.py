@@ -184,7 +184,7 @@ def on_zone_change(name, **kw):
                             userData = ""
 
                         shellyChannel = "0"
-                        if commandsAdv[u"deviceModel"][i] == "shell2_2":
+                        if commandsAdv[u"deviceModel"][i] == "shelly2_2":
                             shellyChannel = "1"
 
                         # TODO: add port
@@ -375,7 +375,7 @@ class update(ProtectedPage):
     """Save user input to cli_control.json file"""
 
     def GET(self):
-        global commandsAdv, runValveOnLine
+        global commandsAdv, runValveOnLine, threadCheckOnLine
 
         check_commands_advance_size()
 
@@ -445,10 +445,12 @@ class check_valve_status(ProtectedPage):
     """Valve status"""
 
     def GET(self):
+        global lastTimeValvesOnLine
+
         qdict = web.input()
 
         if "valveId" in qdict:
-            valveId = qdict["valveId"]
+            valveId = int(qdict["valveId"])
 
             if valveId >= 0 and valveId < len(lastTimeValvesOnLine):
                 lastSeen = lastTimeValvesOnLine[valveId] # to check id
@@ -461,4 +463,4 @@ class check_valve_status(ProtectedPage):
                 else:
                     return "green"
 
-        return ""
+        return "white"

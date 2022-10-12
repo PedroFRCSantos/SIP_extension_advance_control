@@ -4,7 +4,42 @@ $var title: $_(u'SIP ADV Plugin status')
 $var page: advance_control_status
 
 <script>
+	function getXHR() {
+		if (window.XMLHttpRequest) { // code for IE7+, Firefox, Chrome, Opera, Safari
+			return new XMLHttpRequest();
+		}
+		else { // code for IE6, IE5
+			return new ActiveXObject("Microsoft.XMLHTTP");
+		}
+	}
 
+    function updateValveStatus() {
+		var xmlhttp = getXHR();
+
+        $for bid in range(0, gv.sd['nbrd']):
+            $for s in range(0, 8):
+                $ sid = bid * 8 + s;
+                    $if commandsAdv[u"typeOutput"][sid] == 'shellyHTTP' or commandsAdv[u"typeOutput"][sid] == 'sonOff':
+		                xmlhttp.open("GET", "/advsts?valveId=${sid}", false);
+		                xmlhttp.send(null);
+		                document.getElementById("valve${sid}").style.backgroundColor = xmlhttp.responseText;
+	}
+
+    const tellTime = async function () {
+		updateValveStatus();
+	}
+
+	const minutes = 0.2;
+	const interval = minutes * 60 * 1000;
+
+	setInterval(function () {
+		// catch all the errors.
+		tellTime().catch(console.log);
+    }, interval);
+
+	document.addEventListener('DOMContentLoaded', function () {
+		updateValveStatus();
+	}, false);
 </script>
 
 <style>
@@ -18,7 +53,29 @@ $var page: advance_control_status
     <!--     <button class="execute" id="docButton" type="button" >$_('Help')</button> -->
     <!--     </div> -->
     <div>
-        <p>This plugin can be used to control devices such as raspery pi.</p>
-        <p>Activate motors if needed, redirect the wather with valves to the correct place ola vida.</p>
+        <p>Check if your network valves.</p>
+    </div>
+
+    <div align="center">
+        <table width="100%" style="border: 1px solid black;">
+            <tr>
+                <th style="border: 1px solid black;">Valve Name</th>
+                <th style="border: 1px solid black;">Divace type</th>
+                <th style="border: 1px solid black;">Valve Ip</th>
+                <th style="border: 1px solid black;">Is online</th>
+            </tr>
+            $for bid in range(0, gv.sd['nbrd']):
+                $for s in range(0, 8):
+                    $ sid = bid * 8 + s;
+                        $if commandsAdv[u"typeOutput"][sid] == 'shellyHTTP' or commandsAdv[u"typeOutput"][sid] == 'sonOff':
+                            <tr>
+                                <td>${gv.snames[sid]}</td>
+                                <td align="center" width="20%"><img src="static/images/${commandsAdv[u"deviceModel"][sid]}.jpg" width="40%"></td>
+                                <td>${commandsAdv[u"deviceIP"][sid]}</td>
+                                <td id="valve${sid}"></td>
+                            </tr>
+        </table>
+
+        <br /><br />
     </div>
 </div>
