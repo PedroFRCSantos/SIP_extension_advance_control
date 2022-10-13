@@ -57,6 +57,10 @@ def run_check_valves_on_line_keep_state():
 
         for i in range(len(gv.srvals)):
             if commandsAdv[u"typeOutput"][i] == "shellyHTTP" or commandsAdv[u"typeOutput"][i] == "sonOff":
+                port2Use = "80"
+                if len(commandsAdv[u"devicePort"][i]) > 0:
+                    port2Use = str(commandsAdv[u"devicePort"][i])
+
                 if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
                     # use credentials, if present
                     if len(commandsAdv[u"deviceUserName"][i]) > 0:
@@ -64,17 +68,13 @@ def run_check_valves_on_line_keep_state():
                     else:
                         userData = ""
 
-                    # TODO: add port
-
-                    statusURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/status"
+                    statusURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u":" + port2Use + u"/status"
                 else:
-                    statusURL = ""
+                    statusURL = commandsAdv[u"deviceProtocol"][i] + u"://" + commandsAdv[u"deviceIP"][i] + u":" + port2Use + u"/zeroconf/info"
 
                 shellyChannel = "0"
                 if commandsAdv[u"deviceModel"][i] == "shell2_2":
                     shellyChannel = "1"
-
-                # TODO: add port
 
                 devicesAccessProtection[i].acquire()
                 resposeIsOk, response = httpResquestJSON(statusURL)
@@ -83,16 +83,28 @@ def run_check_valves_on_line_keep_state():
                     lastTimeValvesOnLine[i] = datetime.datetime.now()
 
                 # if to keep state if not in the correct state change state
-                if resposeIsOk == 0 and commandsAdv[u"deviceProtocol"][i] == 1:
+                if resposeIsOk == 0 and commandsAdv[u"useLatch"][i] == 0:
                     try:
-                        newState = response['relays'][int(shellyChannel)]['ison'] == 'True'
+                        if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
+                            newState = response['relays'][int(shellyChannel)]['ison'] == 'True'
+                        else:
+                            newState = response['data']['switch'] == 'on'
+
                         if newState and gv.srvals[i] == 0:
-                            turnOffURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/relay/" + shellyChannel + u"?turn=off"
+                            if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
+                                turnOffURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/relay/" + shellyChannel + u"?turn=off"
+                            else:
+                                turnOffURL = commandsAdv[u"deviceProtocol"][i] + u"://" + commandsAdv[u"deviceIP"][i] + u":" + port2Use + u"/zeroconf/switch"
+
                             resposeIsOkOff, response = httpResquestJSON(turnOffURL)
                             if not resposeIsOkOff:
                                 print("Fail to turn off in keep state")
                         elif not newState and gv.srvals[i] == 1:
-                            turnOnURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/relay/" + shellyChannel + u"?turn=on"
+                            if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
+                                turnOnURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/relay/" + shellyChannel + u"?turn=on"
+                            else:
+                                turnOnURL = commandsAdv[u"deviceProtocol"][i] + u"://" + commandsAdv[u"deviceIP"][i] + u":" + port2Use + u"/zeroconf/switch"
+
                             resposeIsOkOn, response = httpResquestJSON(turnOnURL)
                             if not resposeIsOkOn:
                                 print("Fail to turn on in keep state")
@@ -174,6 +186,10 @@ def on_zone_change(name, **kw):
                     #start to lock device to avoid same http requets
                     devicesAccessProtection[i].acquire()
 
+                    port2Use = "80"
+                    if len(commandsAdv[u"devicePort"][i]) > 0:
+                        port2Use = str(commandsAdv[u"devicePort"][i])
+
                     # Check type of shelly, if any use name and password, need to check if relay
                     if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
                         # use shelly HTTP protocol
@@ -187,18 +203,16 @@ def on_zone_change(name, **kw):
                         if commandsAdv[u"deviceModel"][i] == "shelly2_2":
                             shellyChannel = "1"
 
-                        # TODO: add port
+                        turnOnURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u":" + port2Use + u"/relay/" + shellyChannel + u"?turn=on"
+                        turnOffURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u":" + port2Use + u"/relay/" + shellyChannel + u"?turn=off"
 
-                        turnOnURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/relay/" + shellyChannel + u"?turn=on"
-                        turnOffURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/relay/" + shellyChannel + u"?turn=off"
-
-                        statusURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u"/status"
+                        statusURL = commandsAdv[u"deviceProtocol"][i] + u"://" + userData + commandsAdv[u"deviceIP"][i] + u":" + port2Use + u"/status"
                     else:
-                        # TODO: SonOff Code
-                        turnOnURL = ""
-                        turnOffURL = ""
+                        # TODO, need to be tested: SonOff Code
+                        turnOnURL = commandsAdv[u"deviceProtocol"][i] + u"://" + commandsAdv[u"deviceIP"][i] + u":" + port2Use + u"/zeroconf/switch"
+                        turnOffURL = commandsAdv[u"deviceProtocol"][i] + u"://" + commandsAdv[u"deviceIP"][i] + u":" + port2Use + u"zeroconf/switch"
 
-                        statusURL = ""
+                        statusURL = commandsAdv[u"deviceProtocol"][i] + u"://" + commandsAdv[u"deviceIP"][i] + u":" + port2Use + u"/zeroconf/info"
 
                     resposeIsOk, response = httpResquestJSON(statusURL)
 
@@ -206,7 +220,10 @@ def on_zone_change(name, **kw):
                         lastTimeValvesOnLine[i] = datetime.datetime.now()
 
                         try:
-                            lastState = response['relays'][0]['ison'] == 'True'
+                            if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
+                                lastState = response['relays'][int(shellyChannel)]['ison'] == 'True'
+                            else:
+                                lastState = response['data']['switch'] == 'on'
                         except NameError:
                             print("No data fount in respond")
                             resposeIsOk = 4
@@ -222,7 +239,7 @@ def on_zone_change(name, **kw):
                                         if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
                                             newState = response['relays'][int(shellyChannel)]['ison'] == 'True'
                                         else:
-                                            newState = False
+                                            newState = response['data']['switch'] == 'on'
                                     except NameError:
                                         print("No data fount in respond from turn on")
                                         resposeIsOk = 5
@@ -245,7 +262,7 @@ def on_zone_change(name, **kw):
                                         if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
                                             newState = response['relays'][0]['ison'] == 'True'
                                         else:
-                                            newState = False
+                                            newState = response['data']['switch'] == 'on'
                                     except NameError:
                                         print("No data fount in respond from turn on")
                                         resposeIsOk = 5
