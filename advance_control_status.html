@@ -4,14 +4,14 @@ $var title: $_(u'SIP ADV Plugin status')
 $var page: advance_control_status
 
 <script>
-	function getXHR() {
-		if (window.XMLHttpRequest) { // code for IE7+, Firefox, Chrome, Opera, Safari
-			return new XMLHttpRequest();
-		}
-		else { // code for IE6, IE5
-			return new ActiveXObject("Microsoft.XMLHTTP");
-		}
-	}
+    function getXHR() {
+	    if (window.XMLHttpRequest) { // code for IE7+, Firefox, Chrome, Opera, Safari
+		    return new XMLHttpRequest();
+	    }
+	    else { // code for IE6, IE5
+		    return new ActiveXObject("Microsoft.XMLHTTP");
+	    }
+    }
 
     function updateValveStatus() {
 		var xmlhttp = getXHR();

@@ -49,6 +49,37 @@ lastTimeValvesOnLine = {}
 
 runValveOnLine = False
 
+################################################################################
+# Auxiliar Functions                                                           #
+################################################################################
+
+def httpResquestJSON(commandURL):
+    # try to get corrent state of network relay
+    response = None
+
+    try:
+        response = requests.get(commandURL)
+        resposeIsOk = 0
+    except requests.exceptions.Timeout:
+        # Maybe set up for a retry, or continue in a retry loop
+        resposeIsOk = 1
+        print("Connection time out")
+    except requests.exceptions.TooManyRedirects:
+        # Tell the user their URL was bad and try a different one
+        resposeIsOk = 2
+        print("Too many redirections")
+    except requests.exceptions.RequestException as e:
+        # catastrophic error. bail.
+        #raise SystemExit(e)
+        resposeIsOk = 3
+        print("Fatal error")
+
+    return resposeIsOk, response
+
+################################################################################
+# Control functions:                                                           #
+################################################################################
+
 def run_check_valves_on_line_keep_state():
     global lastTimeValvesOnLine
 
@@ -290,30 +321,6 @@ def on_zone_change(name, **kw):
 
         priorAdv = gv.srvals[:]
     return
-
-def httpResquestJSON(commandURL):
-    # try to get corrent state of network relay
-    response = None
-
-    try:
-        response = requests.get(commandURL)
-        resposeIsOk = 0
-    except requests.exceptions.Timeout:
-        # Maybe set up for a retry, or continue in a retry loop
-        resposeIsOk = 1
-        print("Connection time out")
-    except requests.exceptions.TooManyRedirects:
-        # Tell the user their URL was bad and try a different one
-        resposeIsOk = 2
-        print("Too many redirections")
-    except requests.exceptions.RequestException as e:
-        # catastrophic error. bail.
-        #raise SystemExit(e)
-        resposeIsOk = 3
-        print("Fatal error")
-
-    return resposeIsOk, response
-
 
 zones = signal(u"zone_change")
 zones.connect(on_zone_change)
