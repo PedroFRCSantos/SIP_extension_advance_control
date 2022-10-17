@@ -58,7 +58,7 @@ def run_check_valves_on_line_keep_state():
         for i in range(len(gv.srvals)):
             if commandsAdv[u"typeOutput"][i] == "shellyHTTP" or commandsAdv[u"typeOutput"][i] == "sonOff":
                 port2Use = "80"
-                if len(commandsAdv[u"devicePort"][i]) > 0:
+                if len(str(commandsAdv[u"devicePort"][i])) > 0:
                     port2Use = str(commandsAdv[u"devicePort"][i])
 
                 if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
