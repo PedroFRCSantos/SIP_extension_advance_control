@@ -4,6 +4,20 @@ $var title: $_(u'SIP ADV Plugin status')
 $var page: advance_control_status
 
 <script>
+	jQuery(document).ready(function () {
+		jQuery("button#statButton").click(function () {
+			window.location = "/advdisp";
+		});
+
+		jQuery("button#defButton").click(function () {
+			window.location = "/advc";
+		});
+
+		jQuery("#cSubmit").click(function () {
+			jQuery("#advc").submit();
+        });
+	});
+
     function getXHR() {
 	    if (window.XMLHttpRequest) { // code for IE7+, Firefox, Chrome, Opera, Safari
 		    return new XMLHttpRequest();
@@ -53,8 +67,14 @@ $var page: advance_control_status
     <!--     <button class="execute" id="docButton" type="button" >$_('Help')</button> -->
     <!--     </div> -->
     <div>
+        <p>
+            <button class="execute" id="statButton" type="button">Status</button>
+            <button class="execute" id="defButton" type="button">Definition</button>
+        </p>
         <p>Check if your network valves.</p>
     </div>
+
+    <br />
 
     <div align="center">
         <table width="100%" style="border: 1px solid black;">

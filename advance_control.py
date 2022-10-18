@@ -36,8 +36,7 @@ urls.extend(
 # fmt: on
 
 # Add this plugin to the plugins menu
-gv.plugin_menu.append([u"Advance Control", u"/advc"])
-gv.plugin_menu.append([u"Advace Control Valve status", u"/advdisp"])
+gv.plugin_menu.append([u"Advance Control", u"/advdisp"])
 
 commandsAdv = {}
 priorAdv = [0] * len(gv.srvals)
@@ -60,6 +59,8 @@ def httpResquestJSON(commandURL):
     try:
         response = requests.get(commandURL)
         resposeIsOk = 0
+
+        response = response.json()
     except requests.exceptions.Timeout:
         # Maybe set up for a retry, or continue in a retry loop
         resposeIsOk = 1
@@ -114,10 +115,10 @@ def run_check_valves_on_line_keep_state():
                     lastTimeValvesOnLine[i] = datetime.datetime.now()
 
                 # if to keep state if not in the correct state change state
-                if resposeIsOk == 0 and commandsAdv[u"useLatch"][i] == 0:
+                if resposeIsOk == 0 and commandsAdv[u"useLatch"][i] == 0 and commandsAdv[u"deviceKeepState"][i] == 1:
                     try:
                         if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
-                            newState = response['relays'][int(shellyChannel)]['ison'] == 'True'
+                            newState = bool(response['relays'][int(shellyChannel)]['ison'])
                         else:
                             newState = response['data']['switch'] == 'on'
 
@@ -128,7 +129,7 @@ def run_check_valves_on_line_keep_state():
                                 turnOffURL = commandsAdv[u"deviceProtocol"][i] + u"://" + commandsAdv[u"deviceIP"][i] + u":" + port2Use + u"/zeroconf/switch"
 
                             resposeIsOkOff, response = httpResquestJSON(turnOffURL)
-                            if not resposeIsOkOff:
+                            if resposeIsOkOff != 0:
                                 print("Fail to turn off in keep state")
                         elif not newState and gv.srvals[i] == 1:
                             if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
@@ -137,7 +138,7 @@ def run_check_valves_on_line_keep_state():
                                 turnOnURL = commandsAdv[u"deviceProtocol"][i] + u"://" + commandsAdv[u"deviceIP"][i] + u":" + port2Use + u"/zeroconf/switch"
 
                             resposeIsOkOn, response = httpResquestJSON(turnOnURL)
-                            if not resposeIsOkOn:
+                            if resposeIsOkOn != 0:
                                 print("Fail to turn on in keep state")
                     except NameError:
                         print("Error, no data found")
@@ -218,7 +219,7 @@ def on_zone_change(name, **kw):
                     devicesAccessProtection[i].acquire()
 
                     port2Use = "80"
-                    if len(commandsAdv[u"devicePort"][i]) > 0:
+                    if len(str(commandsAdv[u"devicePort"][i])) > 0:
                         port2Use = str(commandsAdv[u"devicePort"][i])
 
                     # Check type of shelly, if any use name and password, need to check if relay
@@ -252,7 +253,7 @@ def on_zone_change(name, **kw):
 
                         try:
                             if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
-                                lastState = response['relays'][int(shellyChannel)]['ison'] == 'True'
+                                lastState = bool(response['relays'][int(shellyChannel)]['ison'])
                             else:
                                 lastState = response['data']['switch'] == 'on'
                         except NameError:
@@ -262,13 +263,13 @@ def on_zone_change(name, **kw):
                         if gv.srvals[i] and not lastState:  # station is off and new state must be on
                             print("Station ned to be on but it is turn of")
                             resposeIsOkOn, response = httpResquestJSON(turnOnURL)
-                            if resposeIsOkOn:
+                            if resposeIsOkOn == 0:
                                 resposeIsOk, response = httpResquestJSON(statusURL)
 
-                                if resposeIsOk:
+                                if resposeIsOk == 0:
                                     try:
                                         if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
-                                            newState = response['relays'][int(shellyChannel)]['ison'] == 'True'
+                                            newState = bool(response['relays'][int(shellyChannel)]['ison'])
                                         else:
                                             newState = response['data']['switch'] == 'on'
                                     except NameError:
@@ -288,10 +289,10 @@ def on_zone_change(name, **kw):
                             if resposeIsOkOn:
                                 resposeIsOk, response = httpResquestJSON(statusURL)
 
-                                if resposeIsOk:
+                                if resposeIsOk == 0:
                                     try:
                                         if commandsAdv[u"typeOutput"][i] == "shellyHTTP":
-                                            newState = response['relays'][0]['ison'] == 'True'
+                                            newState = bool(response['relays'][0]['ison'])
                                         else:
                                             newState = response['data']['switch'] == 'on'
                                     except NameError:
