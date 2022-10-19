@@ -145,6 +145,7 @@ $var page: advance_control
                         https <input type="radio" id="https${sid}" name="protocol${sid}" value="https" ${"checked" if commandsAdv[u"deviceProtocol"][sid] == 'https' else "" }><br /><br />
 
                         Use latch relay (pulse): <input type="checkbox" name="useLatch" ${"checked" if commandsAdv[u"useLatch"][sid] == 1 else "" }>
+                        <input type="number" id="latchDutyCicle${sid}" name="latchDutyCicle${sid}" min="1" max="100" value="${commandsAdv['latchDutyCicle'][sid]}"> Working time to pulse
                     </div>
 
                     <div id="detailsSonOff${sid}" style="display:${"" if commandsAdv[u"typeOutput"][sid] == 'sonOff' else "none" }">

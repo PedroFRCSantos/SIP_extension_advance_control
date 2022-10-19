@@ -105,7 +105,7 @@ def run_check_valves_on_line_keep_state():
                     statusURL = commandsAdv[u"deviceProtocol"][i] + u"://" + commandsAdv[u"deviceIP"][i] + u":" + port2Use + u"/zeroconf/info"
 
                 shellyChannel = "0"
-                if commandsAdv[u"deviceModel"][i] == "shell2_2":
+                if commandsAdv[u"deviceModel"][i] == "shelly2_2":
                     shellyChannel = "1"
 
                 devicesAccessProtection[i].acquire()
@@ -167,7 +167,7 @@ def load_commands():
         with open(u"./data/advance_control.json", u"r") as f:
             commandsAdv = json.load(f)  # Read the commands from file
     except IOError:  #  If file does not exist create file with defaults.
-        commandsAdv = {u"typeOutput": [u""] * gv.sd[u"nst"], u"deviceModel": [u""] * gv.sd[u"nst"], u"deviceIP": [u""] * gv.sd[u"nst"], u"deviceProtocol": [u""] * gv.sd[u"nst"], u"devicePort": [u""] * gv.sd[u"nst"], u"deviceUserName": [u""] * gv.sd[u"nst"], u"devicePassword": [u""] * gv.sd[u"nst"], u"deviceKeepState": [0] * gv.sd[u"nst"], u"on": [u""] * gv.sd[u"nst"], u"off": [u""] * gv.sd[u"nst"], u"useLatch": [0] * gv.sd[u"nst"], u"gpio": 0}
+        commandsAdv = {u"typeOutput": [u""] * gv.sd[u"nst"], u"deviceModel": [u""] * gv.sd[u"nst"], u"deviceIP": [u""] * gv.sd[u"nst"], u"deviceProtocol": [u""] * gv.sd[u"nst"], u"devicePort": [u""] * gv.sd[u"nst"], u"deviceUserName": [u""] * gv.sd[u"nst"], u"devicePassword": [u""] * gv.sd[u"nst"], u"deviceKeepState": [0] * gv.sd[u"nst"], u"on": [u""] * gv.sd[u"nst"], u"off": [u""] * gv.sd[u"nst"], u"useLatch": [0] * gv.sd[u"nst"], u"latchDutyCicle": [5] * gv.sd[u"nst"], u"gpio": 0}
 
         # set the protocol by default http and port 80
         for i in range(gv.sd[u"nst"]):
@@ -312,8 +312,8 @@ def on_zone_change(name, **kw):
                         # use lactch and valve is online
                         print("use latch")
                         resposeIsOkOn, response = httpResquestJSON(turnOnURL)
-                        time.sleep(5)
-                        if resposeIsOkOn:
+                        time.sleep(commandsAdv[u"latchDutyCicle"][i])
+                        if resposeIsOkOn == 0:
                             resposeIsOkOff, response = httpResquestJSON(turnOffURL)
                             if resposeIsOkOff:
                                 print("Latch sucess")
@@ -352,6 +352,7 @@ def check_commands_advance_size():
             commandsAdv[u"deviceKeepState"].extend(increase)
 
             commandsAdv[u"useLatch"].extend(increase)
+            commandsAdv[u"latchDutyCicle"].extend(increase)
 
             commandsAdv[u"on"].extend(increase)
             commandsAdv[u"off"].extend(increase)
@@ -372,6 +373,7 @@ def check_commands_advance_size():
             commandsAdv[u"deviceKeepState"] = commandsAdv[u"deviceKeepState"][: gv.sd[u"nst"]]
 
             commandsAdv[u"useLatch"] = commandsAdv[u"useLatch"][: gv.sd[u"nst"]]
+            commandsAdv[u"latchDutyCicle"] = commandsAdv[u"latchDutyCicle"][: gv.sd[u"nst"]]
 
             commandsAdv[u"on"] = commandsAdv[u"on"][: gv.sd[u"nst"]]
             commandsAdv[u"off"] = commandsAdv[u"off"][: gv.sd[u"nst"]]
@@ -429,14 +431,18 @@ class update(ProtectedPage):
                     commandsAdv[u"deviceProtocol"][i] = qdict[u"protocol" + str(i)]
 
                 if (u"useLatch" + str(i)) in qdict:
-                    commandsAdv[u"useLatch"][i] = 0
-                else:
                     commandsAdv[u"useLatch"][i] = 1
+                else:
+                    commandsAdv[u"useLatch"][i] = 0
+
+                commandsAdv[u"latchDutyCicle"][i] = 5
+                if len(str(qdict[u"latchDutyCicle" + str(i)])) > 0:
+                    commandsAdv[u"latchDutyCicle"][i] = int(qdict[u"latchDutyCicle" + str(i)])
 
                 if (u"deviceKeepState" + str(i)) in qdict:
-                    commandsAdv[u"deviceKeepState"][i] = 0
-                else:
                     commandsAdv[u"deviceKeepState"][i] = 1
+                else:
+                    commandsAdv[u"deviceKeepState"][i] = 0
 
             commandsAdv[u"on"][i] = qdict[u"con" + str(i)]
             commandsAdv[u"off"][i] = qdict[u"coff" + str(i)]
