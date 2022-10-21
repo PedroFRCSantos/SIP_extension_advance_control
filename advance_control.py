@@ -31,6 +31,7 @@ urls.extend(
         u"/advu", u"plugins.advance_control.update",
         u"/advdisp", u"plugins.advance_control.valve_status_display",
         u"/advsts", u"plugins.advance_control.check_valve_status",
+        u"/advls", u"plugins.advance_control.valve_latch_send_signal",
     ]
 )
 # fmt: on
@@ -495,3 +496,55 @@ class check_valve_status(ProtectedPage):
                     return "green"
 
         return "white"
+
+class valve_latch_send_signal(ProtectedPage):
+    """Send valve latch signal"""
+
+    def GET(self):
+        qdict = web.input()
+        if "valveId" in qdict:
+            valveId = int(qdict["valveId"])
+
+            if valveId >= 0 and valveId < gv.sd[u"nst"]:
+                if commandsAdv[u"typeOutput"][valveId] == "shellyHTTP" or commandsAdv[u"typeOutput"][valveId] == "sonOff":
+                    if devicesAccessProtection[valveId].locked():
+                        # already lock, avoid multy test in the same time
+                        return "Waitting"
+
+                    devicesAccessProtection[valveId].acquire()
+
+                    if commandsAdv[u"typeOutput"][valveId] == "shellyHTTP":
+                        # use credentials, if present
+                        if len(commandsAdv[u"deviceUserName"][valveId]) > 0:
+                            userData = commandsAdv[u"deviceUserName"][valveId] + ":" + commandsAdv[u"devicePassword"][valveId] + "@"
+                        else:
+                            userData = ""
+
+                        shellyChannel = "0"
+                        if commandsAdv[u"deviceModel"][valveId] == "shelly2_2":
+                            shellyChannel = "1"
+
+                        port2Use = "80"
+                        if len(str(commandsAdv[u"devicePort"][valveId])) > 0:
+                            port2Use = str(commandsAdv[u"devicePort"][valveId])
+
+                        turnOnURL = commandsAdv[u"deviceProtocol"][valveId] + u"://" + userData + commandsAdv[u"deviceIP"][valveId] + u":" + port2Use + u"/relay/" + shellyChannel + u"?turn=on"
+                        turnOffURL = commandsAdv[u"deviceProtocol"][valveId] + u"://" + userData + commandsAdv[u"deviceIP"][valveId] + u":" + port2Use + u"/relay/" + shellyChannel + u"?turn=off"
+                    else:
+                        pass
+
+                    devicesAccessProtection[valveId].release()
+
+                    # Guaranty that valve is turn off
+                    resposeIsOkOff, response = httpResquestJSON(turnOffURL)
+                    time.sleep(2 * commandsAdv[u"latchDutyCicle"][valveId])
+
+                    if resposeIsOkOff == 0:
+                        resposeIsOkOn, response = httpResquestJSON(turnOnURL)
+                        if resposeIsOkOn == 0:
+                            time.sleep(commandsAdv[u"latchDutyCicle"][valveId])
+                            resposeIsOkOff, response = httpResquestJSON(turnOffURL)
+                            if resposeIsOkOff == 0:
+                                return "OK"
+                else:
+                    return "NOK"
