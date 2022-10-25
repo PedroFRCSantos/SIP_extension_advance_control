@@ -99,7 +99,7 @@ $var page: advance_control_status
                                 <tr>
                                     <td>${gv.snames[sid]}</td>
                                     <td align="center" width="20%"><img src="static/images/${commandsAdv[u"deviceModel"][sid]}.jpg" width="40%"></td>
-                                    <td>${commandsAdv[u"deviceIP"][sid]}<br /><button id="latchManualSignal${sid}" class="submit" onclick="sendLatchToValve(${sid})"><b>$_(u'Submit')</b></button><div id="lactchStatus${sid}"></div></td>
+                                    <td>${commandsAdv[u"deviceIP"][sid]}<br /><button id="latchManualSignal${sid}" class="submit" onclick="sendLatchToValve(${sid})"><b>Send latch signal</b></button><div id="lactchStatus${sid}"></div></td>
                                     <td id="valve${sid}"></td>
                                 </tr>
                             $else:
