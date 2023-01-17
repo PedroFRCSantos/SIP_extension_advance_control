@@ -22,6 +22,13 @@ from urls import urls  # Get access to SIP's URLs
 import web
 from webpages import ProtectedPage
 
+try:
+    from db_logger import db_logger_read_definitions
+    from db_logger_generic_table import create_generic_table, add_date_generic_table
+    withDBLogger = True
+except ImportError:
+    withDBLogger = False
+
 # Add a new url to open the data entry page.
 # fmt: off
 urls.extend(
@@ -138,6 +145,13 @@ def generateStatusFunctionNet(idx):
 
 def run_check_valves_on_line_keep_state():
     global lastTimeValvesOnLine
+    valvesStates = []
+    for i in range(len(gv.srvals)):
+        valvesStates.append(False)
+    isFirstRun = True
+
+    if withDBLogger and commandsAdv[u"Log2DB"]:
+        dbDefinitions = db_logger_read_definitions()
 
     while runValveOnLine:
         lastTime = datetime.datetime.now()
@@ -156,6 +170,31 @@ def run_check_valves_on_line_keep_state():
 
                 if resposeIsOk == 0:
                     lastTimeValvesOnLine[i] = datetime.datetime.now()
+                    if isFirstRun:
+                        if withDBLogger and commandsAdv[u"Log2DB"]:
+                            listData = ["'Valve become on-line in first run.'", "'"+ lastTimeValvesOnLine[i].strftime("%Y-%m-%d %H:%M:%S") + "'"]
+                            add_date_generic_table('advance_control', listData, dbDefinitions, i + 1)
+                else:
+                    timeNow = datetime.datetime.now()
+
+                    if isFirstRun:
+                        if withDBLogger and commandsAdv[u"Log2DB"]:
+                            listData = ["'Valve become off-line in first run.'", "'"+ lastTimeValvesOnLine[i].strftime("%Y-%m-%d %H:%M:%S") + "'"]
+                            add_date_generic_table('advance_control', listData, dbDefinitions, i + 1)
+                    else:
+                        lastSeen = lastTimeValvesOnLine[i] # to check id
+                        timeNow = datetime.datetime.now()
+                        diff = timeNow - lastSeen
+                        if diff.seconds > 45:
+                            if valvesStates[i]:
+                                listData = ["'Valve become off-line.'", "'"+ lastTimeValvesOnLine[i].strftime("%Y-%m-%d %H:%M:%S") + "'"]
+                                add_date_generic_table('advance_control', listData, dbDefinitions, i + 1)
+                            valvesStates[i] = False
+                        else:
+                            if not valvesStates[i]:
+                                listData = ["'Valve become on-line.'", "'"+ lastTimeValvesOnLine[i].strftime("%Y-%m-%d %H:%M:%S") + "'"]
+                                add_date_generic_table('advance_control', listData, dbDefinitions, i + 1)
+                            valvesStates[i] = True
 
                 # if to keep state if not in the correct state change state
                 if resposeIsOk == 0 and commandsAdv[u"useLatch"][i] == 0 and commandsAdv[u"deviceKeepState"][i] == 1:
@@ -176,7 +215,9 @@ def run_check_valves_on_line_keep_state():
                     except NameError:
                         print("Error, no data found")
 
-                devicesAccessProtection[i].release()      
+                devicesAccessProtection[i].release()  
+                
+        isFirstRun = False
 
         nowTime = datetime.datetime.now()
 
@@ -199,8 +240,10 @@ def load_commands():
     try:
         with open(u"./data/advance_control.json", u"r") as f:
             commandsAdv = json.load(f)  # Read the commands from file
+            if "Log2DB" not in commandsAdv:
+                commandsAdv[u"Log2DB"] = True
     except IOError:  #  If file does not exist create file with defaults.
-        commandsAdv = {u"typeOutput": [u""] * gv.sd[u"nst"], u"deviceModel": [u""] * gv.sd[u"nst"], u"deviceIP": [u""] * gv.sd[u"nst"], u"deviceProtocol": [u""] * gv.sd[u"nst"], u"devicePort": [u""] * gv.sd[u"nst"], u"deviceUserName": [u""] * gv.sd[u"nst"], u"devicePassword": [u""] * gv.sd[u"nst"], u"deviceKeepState": [0] * gv.sd[u"nst"], u"on": [u""] * gv.sd[u"nst"], u"off": [u""] * gv.sd[u"nst"], u"useLatch": [0] * gv.sd[u"nst"], u"latchDutyCicle": [5] * gv.sd[u"nst"], u"gpio": 0}
+        commandsAdv = {u"typeOutput": [u""] * gv.sd[u"nst"], u"deviceModel": [u""] * gv.sd[u"nst"], u"deviceIP": [u""] * gv.sd[u"nst"], u"deviceProtocol": [u""] * gv.sd[u"nst"], u"devicePort": [u""] * gv.sd[u"nst"], u"deviceUserName": [u""] * gv.sd[u"nst"], u"devicePassword": [u""] * gv.sd[u"nst"], u"deviceKeepState": [0] * gv.sd[u"nst"], u"on": [u""] * gv.sd[u"nst"], u"off": [u""] * gv.sd[u"nst"], u"useLatch": [0] * gv.sd[u"nst"], u"latchDutyCicle": [5] * gv.sd[u"nst"], u"gpio": 0, u"Log2DB": False}
 
         # set the protocol by default http and port 80
         for i in range(gv.sd[u"nst"]):
@@ -214,6 +257,13 @@ def load_commands():
 
     devicesAccessProtection = [Lock()] * gv.sd[u"nst"]
     lastTimeValvesOnLine = [datetime.datetime.now()] * gv.sd[u"nst"]
+
+    # if log to db active, create table
+    if withDBLogger and commandsAdv[u"Log2DB"]:
+        listElements = {"AdvanceControlFK": "valve", "AdvanceControlData" : "TEXT", "AdvanceControlTime" : "datetime"}
+
+        dbDefinitions = db_logger_read_definitions()
+        create_generic_table("advance_control", listElements, dbDefinitions)
 
     runValveOnLine = True
     threadCheckOnLine = Thread(target = run_check_valves_on_line_keep_state)
