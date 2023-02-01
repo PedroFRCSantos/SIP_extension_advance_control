@@ -172,14 +172,14 @@ def run_check_valves_on_line_keep_state():
                     lastTimeValvesOnLine[i] = datetime.datetime.now()
                     if isFirstRun:
                         if withDBLogger and commandsAdv[u"Log2DB"]:
-                            listData = ["'Valve become on-line in first run.'", "'"+ lastTimeValvesOnLine[i].strftime("%Y-%m-%d %H:%M:%S") + "'"]
+                            listData = ["Valve become on-line in first run.", lastTimeValvesOnLine[i].strftime("%Y-%m-%d %H:%M:%S")]
                             add_date_generic_table('advance_control', listData, dbDefinitions, i + 1)
                 else:
                     timeNow = datetime.datetime.now()
 
                     if isFirstRun:
                         if withDBLogger and commandsAdv[u"Log2DB"]:
-                            listData = ["'Valve become off-line in first run.'", "'"+ lastTimeValvesOnLine[i].strftime("%Y-%m-%d %H:%M:%S") + "'"]
+                            listData = ["Valve become off-line in first run.", lastTimeValvesOnLine[i].strftime("%Y-%m-%d %H:%M:%S")]
                             add_date_generic_table('advance_control', listData, dbDefinitions, i + 1)
                     else:
                         lastSeen = lastTimeValvesOnLine[i] # to check id
@@ -187,12 +187,12 @@ def run_check_valves_on_line_keep_state():
                         diff = timeNow - lastSeen
                         if diff.seconds > 45:
                             if valvesStates[i]:
-                                listData = ["'Valve become off-line.'", "'"+ lastTimeValvesOnLine[i].strftime("%Y-%m-%d %H:%M:%S") + "'"]
+                                listData = ["Valve become off-line.", lastTimeValvesOnLine[i].strftime("%Y-%m-%d %H:%M:%S")]
                                 add_date_generic_table('advance_control', listData, dbDefinitions, i + 1)
                             valvesStates[i] = False
                         else:
                             if not valvesStates[i]:
-                                listData = ["'Valve become on-line.'", "'"+ lastTimeValvesOnLine[i].strftime("%Y-%m-%d %H:%M:%S") + "'"]
+                                listData = ["Valve become on-line.", lastTimeValvesOnLine[i].strftime("%Y-%m-%d %H:%M:%S")]
                                 add_date_generic_table('advance_control', listData, dbDefinitions, i + 1)
                             valvesStates[i] = True
 
